@@ -24,6 +24,35 @@ async function cargarAnuncios() {
 }
 
 /* ─────────────────────────────────
+    Cargar materias dinamicamente desde la BD
+    tanto para el filtro lateral como para el modal
+───────────────────────────────── */
+async function cargarMaterias() {
+  try {
+    const res = await fetch('http://localhost:3000/api/materias');
+    const materias = await res.json();
+
+    // los dos selects que necesitan las materias
+    const selects = [
+      document.getElementById('filterMateria'),
+      document.getElementById('aMateria')
+    ];
+
+    selects.forEach(select => {
+      materias.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id_materia;
+        opt.textContent = m.nombre;
+        select.appendChild(opt);
+      });
+    });
+
+  } catch (error) {
+    console.error('Error al cargar las materias:', error);
+  }
+}
+
+/* ─────────────────────────────────
    Renderizar tarjetas
 ───────────────────────────────── */
 function renderBooks(books) {
@@ -40,13 +69,13 @@ function renderBooks(books) {
   grid.innerHTML = books.map(b => `
     <div class="book-card">
       <div class="book-img-wrapper">
-        <img src="${b.img}" alt="${b.titulo}" onerror="this.src=''"/>
-        <span class="badge-estado badge-${b.estado === 'Nuevo' ? 'nuevo' : 'usado'}">${b.estado}</span>
+        <img src="http://localhost:3000/api/${b.foto_url}" alt="${b.titulo}" onerror="this.src='IMG/books.png'"/>
+        <span class="badge-estado badge-${b.condicion === 1 ? 'nuevo' : 'usado'}">${b.condicion === 1 ? 'Nuevo' : 'Usado'}</span>
       </div>
       <div class="book-body">
         <div class="book-title">${b.titulo}</div>
         <div class="book-author">${b.autor}</div>
-        <div class="book-edicion">${b.edicion}</div>
+        <div class="book-edicion">${b.edicion || ''}</div>
         <div class="book-materia">${b.materia}</div>
         <a href="https://wa.me/58${b.telefono.replace(/^0/,'')}?text=${encodeURIComponent('Hola, vi tu anuncio de "' + b.titulo + '" en U-Books y me interesa.')}"
            class="btn-contacto" target="_blank" rel="noopener">
@@ -58,10 +87,10 @@ function renderBooks(books) {
 }
 
 /* ─────────────────────────────────
-   Filtrar
+   Filtrar/Normalizar texto
 ───────────────────────────────── */
-function limpiarTexto(searchInput) {
-  return searchInput
+function limpiarTexto(texto) {
+  return texto
     // 1. Separa las letras de sus acentos (ej: "á" se vuelve "a" + "´")
     .normalize("NFD") 
     // 2. Elimina los símbolos de los acentos usando una expresión regular
@@ -70,6 +99,9 @@ function limpiarTexto(searchInput) {
     .toLowerCase(); 
 }
 
+/* ─────────────────────────────────
+  Filtrar (solo un checkbox activo a la vez)
+─────────────────────────────────*/
 function toggleCheckbox(elementoClickeado) {
   if (elementoClickeado.id === 'chkNuevo' && elementoClickeado.checked) {
     document.getElementById('chkUsado').checked = false;
@@ -79,6 +111,9 @@ function toggleCheckbox(elementoClickeado) {
   }
 }
 
+/*─────────────────────────────────
+  Filtrar (libros)
+─────────────────────────────────*/
 function filterBooks() {
   const query   = limpiarTexto(document.getElementById('searchInput').value);
   const materia = document.getElementById('filterMateria').value;
@@ -87,8 +122,8 @@ function filterBooks() {
 
   visibleBooks = allBooks.filter(b => {
     const matchSearch  = !query || limpiarTexto(b.titulo).includes(query) || limpiarTexto(b.autor).includes(query);
-    const matchMateria = !materia || b.materia === materia;
-    const matchEstado  = (!nuevo && !usado) || (nuevo && b.estado === 'Nuevo') || (usado && b.estado === 'Usado');
+    const matchMateria = !materia || b.materia === parseInt(materia);
+    const matchEstado  = (!nuevo && !usado) || (nuevo && b.condicion === 1) || (usado && b.condicion === 0);
     return matchSearch && matchMateria && matchEstado;
   });
 
@@ -104,7 +139,7 @@ function sortBooks() {
 
   if (sort === 'az') copy.sort((a,b) => a.titulo.localeCompare(b.titulo));
   else if (sort === 'za') copy.sort((a,b) => b.titulo.localeCompare(a.titulo));
-  else copy.sort((a,b) => b.fecha - a.fecha);
+  else copy.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
 
   renderBooks(copy);
 }
@@ -129,50 +164,15 @@ function toggleDropdown() {
 }
 document.addEventListener('click', function(e) {
   const wrapper = document.querySelector('.profile-wrapper');
-  if (!wrapper.contains(e.target)) {
+  if (wrapper &&!wrapper.contains(e.target)) {
     document.getElementById('profileDropdown').classList.remove('open');
   }
 });
 
-/* ─────────────────────────────────
-    Cargar materias dinamicamente desde la BD
-───────────────────────────────── */
-async function cargarMaterias() {
-  const selectFiltro = document.getElementById('filterMateria');
-  const selectModal = document.getElementById('aMateria');
 
-  // Limpiamos las opciones anteriores
-  if (selectFiltro) selectFiltro.innerHTML = '<option value="">Seleccionar materia</option>';
-  if (selectModal)  selectModal.innerHTML  = '<option value="" disabled selected>Selecciona la materia</option>';
-
-  try {
-    const res = await fetch('http://localhost:3000/api/materias');
-    const materias = await res.json();
-
-    materias.forEach(m => {
-      // 1. LLenar el select del filtro, usando el nombre para compara texto
-      if (selectFiltro) {
-        const opt = document.createElement('option');
-        opt.value = m.nombre;
-        opt.textContent = m.nombre;
-        selectFiltro.appendChild(opt);
-      }
-
-      // 2. LLenar el select del modal, usando el id_materia para la DB
-      if (selectModal) {
-        const opt = document.createElement('option');
-        opt.value = m.id_materia;
-        opt.textContent = m.nombre;
-        selectModal.appendChild(opt);
-      }
-    });
-    } catch (error) {
-      console.error('Error al cargar las materias:', error);
-    }
-  }
 
 /* ─────────────────────────────────
-   Modal Crear Anuncio
+   Modal Crear Anuncio - preview image
 ───────────────────────────────── */
 function togglePublish() {
   const checked = document.getElementById('terminosAnuncio').checked;
@@ -185,11 +185,12 @@ function previewImage(event) {
 
   // Validar tamaño (10 MB = 10 * 1024 * 1024)
   if (file.size > 10 * 1024 * 1024) {
-    alert('La imagen supera el límite de 10 MB. Por favor elige una imagen más pequeña.');
+    alert('La imagen supera el límite de 10 MB.');
     event.target.value = '';
     return;
   }
 
+  // Cargar imagen
   const reader = new FileReader();
   reader.onload = function(e) {
     const box = document.getElementById('previewBox');
@@ -204,42 +205,63 @@ function previewImage(event) {
   reader.readAsDataURL(file);
 }
 
+/* ─────────────────────────────────
+   Publicar anuncio, POST /api/anuncios
+───────────────────────────────── */
 function publicarAnuncio() {
   const titulo  = document.getElementById('aTitulo').value.trim();
   const autor   = document.getElementById('aAutor').value.trim();
-  const materia = document.getElementById('aMateria').value;
+  const id_materia = document.getElementById('aMateria').value;
   const edicion = document.getElementById('aEdicion').value.trim();
-  const estado  = document.getElementById('aEstado').value;
+  const condicion = document.getElementById('aEstado').value;
+  const foto  = document.getElementById('fotoInput').files[0];
 
-  if (!titulo || !autor || !materia || !estado) {
+  if (!titulo || !autor || !id_materia || !condicion || !foto) {
     alert('Por favor completa todos los campos obligatorios.');
     return;
   }
 
-  // Agregar el nuevo libro al catálogo
-  const nuevo = {
-    titulo,
-    autor,
-    materia,
-    edicion,
-    estado,
-    telefono: '04140000000',
-    img: document.querySelector('#previewBox img')?.src ||
-         'https://via.placeholder.com/300x175?text=Sin+imagen',
-    fecha: Date.now()
-  };
-  allBooks.unshift(nuevo);
-  visibleBooks = [...allBooks];
+  // Construir el formData (necesario para enviar la imagen)
+  const formData = new FormData();
+  formData.append('id_usuario', usuarioActivo.id_usuario);
+  formData.append('titulo', titulo);
+  formData.append('autor', autor);
+  formData.append('id_materia', id_materia);
+  formData.append('edicion', edicion);
+  formData.append('condicion', condicion);
+  formData.append('foto', foto);
 
-  // Cerrar modal, limpiar y mostrar toast
-  bootstrap.Modal.getInstance(document.getElementById('modalAnuncio')).hide();
-  resetModal();
-  sortBooks();
+  // Enviar anuncio
+  try {
+    const res = await fetch('http://localhost:3000/api/anuncios', {
+      method: 'POST',
+      body: formData //sin Content-type, el navegador lo arma solo para formdata
+    });
 
-  const toast = new bootstrap.Toast(document.getElementById('toastPublicado'));
-  toast.show();
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'Error al publicar el anuncio.');
+      return;
+    }
+
+    // Cerrar modal, limpiar y recargar anuncios 
+    bootstrap.Modal.getInstance(document.getElementById('modalAnuncio')).hide();
+    resetModal();
+    await cargarAnuncios(); //recarga los datos actualizados
+
+    // Mostrar toast
+    const toast = new bootstrap.toast(document.getElementById('toastPublicado'));
+    toast.show();
+  
+  } catch (error) {
+    console.error('Error al publicar el anuncio:', error);
+  }
 }
 
+/* ─────────────────────────────────
+   Limpiar modal al cerrarlo
+───────────────────────────────── */
 function resetModal() {
   document.getElementById('aTitulo').value  = '';
   document.getElementById('aAutor').value   = '';
@@ -248,6 +270,8 @@ function resetModal() {
   document.getElementById('aEstado').value  = '';
   document.getElementById('terminosAnuncio').checked = false;
   document.getElementById('btnPublicar').disabled = true;
+
+  // Limpiar previewBox
   const box   = document.getElementById('previewBox');
   const input = box.querySelector('input[type=file]');
   box.innerHTML = `
@@ -258,13 +282,10 @@ function resetModal() {
   input.value = '';
 }
 
-// Limpiar modal al cerrarlo
 document.getElementById('modalAnuncio').addEventListener('hidden.bs.modal', resetModal);
 
 /* ─────────────────────────────────
    Carga inicial
 ───────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
-CargarAnuncios();
 cargarMaterias();
-});
+CargarAnuncios();
