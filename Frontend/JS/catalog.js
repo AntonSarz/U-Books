@@ -72,12 +72,14 @@ function renderBooks(books) {
         <img src="http://localhost:3000${b.foto_url}" alt="${b.titulo}" onerror="this.src='../IMG/books.png'"/>
         <span class="badge-estado badge-${b.condicion === 1 ? 'nuevo' : 'usado'}">${b.condicion === 1 ? 'Nuevo' : 'Usado'}</span>
       </div>
+      
       <div class="book-body">
         <div class="book-title">${b.titulo}</div>
         <div class="book-author">${b.autor}</div>
         <div class="book-edicion">${b.edicion || ''}</div>
         <div class="book-materia">${b.materia}</div>
-        <a href="https://wa.me/58${b.telefono.replace(/^0/,'')}?text=${encodeURIComponent('Hola, vi tu anuncio de "' + b.titulo + '" en U-Books y me interesa.')}"
+        
+        <a href="https://wa.me/58${b.telefono.replace(/\D/g, '').replace(/^0/,'')}?text=${encodeURIComponent('Hola, vi tu anuncio de "' + b.titulo + '" en U-Books y me interesa.')}"
            class="btn-contacto" target="_blank" rel="noopener">
           Ver contacto <i class="bi bi-whatsapp wa-icon"></i>
         </a>
