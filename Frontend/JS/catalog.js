@@ -69,7 +69,7 @@ function renderBooks(books) {
   grid.innerHTML = books.map(b => `
     <div class="book-card">
       <div class="book-img-wrapper">
-        <img src="http://localhost:3000/api/${b.foto_url}" alt="${b.titulo}" onerror="this.src='IMG/books.png'"/>
+        <img src="http://localhost:3000${b.foto_url}" alt="${b.titulo}" onerror="this.src='IMG/books.png'"/>
         <span class="badge-estado badge-${b.condicion === 1 ? 'nuevo' : 'usado'}">${b.condicion === 1 ? 'Nuevo' : 'Usado'}</span>
       </div>
       <div class="book-body">
@@ -122,7 +122,7 @@ function filterBooks() {
 
   visibleBooks = allBooks.filter(b => {
     const matchSearch  = !query || limpiarTexto(b.titulo).includes(query) || limpiarTexto(b.autor).includes(query);
-    const matchMateria = !materia || b.materia === parseInt(materia);
+    const matchMateria = !materia || b.id_materia === parseInt(materia);
     const matchEstado  = (!nuevo && !usado) || (nuevo && b.condicion === 1) || (usado && b.condicion === 0);
     return matchSearch && matchMateria && matchEstado;
   });
@@ -208,7 +208,9 @@ function previewImage(event) {
 /* ─────────────────────────────────
    Publicar anuncio, POST /api/anuncios
 ───────────────────────────────── */
-function publicarAnuncio() {
+async function publicarAnuncio(e) {
+  e.preventDefault();
+
   const titulo  = document.getElementById('aTitulo').value.trim();
   const autor   = document.getElementById('aAutor').value.trim();
   const id_materia = document.getElementById('aMateria').value;
@@ -251,8 +253,7 @@ function publicarAnuncio() {
     await cargarAnuncios(); //recarga los datos actualizados
 
     // Mostrar toast
-    const toast = new bootstrap.toast(document.getElementById('toastPublicado'));
-    toast.show();
+    const toast = new bootstrap.Toast(document.getElementById('toastPublicado')).show();
   
   } catch (error) {
     console.error('Error al publicar el anuncio:', error);
@@ -288,4 +289,6 @@ document.getElementById('modalAnuncio').addEventListener('hidden.bs.modal', rese
    Carga inicial
 ───────────────────────────────── */
 cargarMaterias();
-CargarAnuncios();
+cargarAnuncios();
+
+document.getElementById('anuncioForm').addEventListener('submit', publicarAnuncio);

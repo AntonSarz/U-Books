@@ -8,7 +8,7 @@ router.get('/', async (req, res) =>{
     try{
         // Obtener los anuncios de la base de datos 
         const [anuncios] = await db.query(`SELECT a.id_anuncio, a.titulo, a.autor, a.edicion, a.condicion, 
-            a.disponible, a.foto_url, a.fecha, u.telefono, m.nombre AS materia 
+            a.disponible, a.foto_url, a.fecha, u.telefono, a.id_materia, m.nombre AS materia 
         FROM anuncios a 
         JOIN materias m ON a.id_materia = m.id_materia 
         JOIN usuarios u ON a.id_usuario = u.id_usuario
@@ -28,7 +28,7 @@ router.get('/usuario/:id_usuario', async (req, res) => {
     try{
         // Obtener los anuncios de la base de datos
         const [anuncios] = await db.query(`SELECT a.id_anuncio, a.titulo, a.autor, a.edicion, a.condicion, 
-            a.disponible, a.foto_url, a.fecha, m.nombre AS materia
+            a.disponible, a.foto_url, a.fecha, a.id_materia, m.nombre AS materia
             FROM anuncios a
             JOIN materias m ON a.id_materia = m.id_materia
             WHERE a.id_usuario = ? AND a.borrado = 0
