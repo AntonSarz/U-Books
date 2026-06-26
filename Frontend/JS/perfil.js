@@ -1,19 +1,32 @@
+/* ─────────────────────────────────────────────────────────
+  MÓDULO DE PERFIL DE USUARIO
+───────────────────────────────────────────────────────────*/
+// Diseñado para administrar el perfil del usuario activo. 
+// gestionar la edicion de datos personales y vizualizar los anuncios publicados,
+// controlar su disponibilidad y su borrado.
+
 /* ─────────────────────────────────
    Verificar sesión
 ───────────────────────────────── */
+// Recupera el objeto del usuario logueado
 const usuarioActivo = obtenerUsuario();
 
 /* ─────────────────────────────────
    Estado de la aplicación 
 ───────────────────────────────── */
-let ads = [];
-let activeTab     = 'todos';
-let pendingDelete = null;
+let ads = [];                         //Cache local que almacena todos los anuncios del usuario
+let activeTab     = 'todos';          // rastrea la pestaña de filtrado actual  
+let pendingDelete = null;             // almacena el ID del anuncio que se quiere borrar
+
 
 /* ─────────────────────────────────
    Carga inicial - perfil, anuncios,
    carreras y materias
 ───────────────────────────────── */
+// Ejecuta multiples peticiones HTTP en paralelo para cargar los datos de la aplicación
+//  El promise.all asegura que la vista no se inicializa hasta que todas las peticiones
+//  han terminado de cargarse.
+
 async function inicializar() {
   await Promise.all([
     cargarPerfil(),
@@ -26,11 +39,13 @@ async function inicializar() {
 /* ─────────────────────────────────
    Carga inicial - datos del perfil
 ───────────────────────────────── */
+// Obtiene los datos actualizados del usuario desde la base de datos
 async function cargarPerfil() {
   try {
     const res = await fetch(`/api/usuarios/${usuarioActivo.id_usuario}`);
     const data = await res.json();
 
+    // inyecta el texto de manera segura con textContent
     document.getElementById('displayNombre').textContent = data.nombre_completo;
     document.getElementById('displayEmail').textContent = data.email;
     document.getElementById('displayTelefono').textContent = data.telefono;
@@ -50,11 +65,12 @@ async function cargarPerfil() {
 /* ─────────────────────────────────
    Carga inicial - anuncios del usuario
 ───────────────────────────────── */
+// Descarga el listado completo de anuncios publicados por el usuario
 async function cargarAnuncios() {
   try {
   const res = await fetch(`/api/anuncios/usuario/${usuarioActivo.id_usuario}`);
   ads = await res.json();
-  renderAds();
+  renderAds();            // Actualiza la vista
     } catch (error) {
       console.error('Error al cargar anuncios:', error);
     }
@@ -64,6 +80,7 @@ async function cargarAnuncios() {
   Carga inicial - carreras para el 
   modal de editar perfil
 ─────────────────────────────────*/
+// LLena el select de carreras para la edición del perfil
 async function cargarCarreras() {
   try {
     const res = await fetch('/api/carreras');
@@ -86,6 +103,7 @@ async function cargarCarreras() {
   Carga inicial - materias para el 
   modal de editar anuncios
 ─────────────────────────────────*/
+// LLena el select de materias para la edición de libros
 async function cargarMaterias() {
   try {
     const res = await fetch('/api/materias');
@@ -107,19 +125,22 @@ async function cargarMaterias() {
 /* ─────────────────────────────────
    Renderizar anuncios
 ───────────────────────────────── */
+// evalua el estado de la pestaña actual, filtra los anuncios y construye el html
 function renderAds() {
   const list = document.getElementById('adsList');
   const noAds = document.getElementById('noAds');
 
+  // filtrado condicional en memoria (evita tener que buscar en la base de datos cada vez)
   let filtered = ads;
   if (activeTab === 'disponible') filtered = ads.filter(a => a.disponible === 1);
   if (activeTab === 'vendido')    filtered = ads.filter(a => a.disponible === 0);
 
-  // Actualizar contadores de tabs
+  // Actualizar contadores de los contadores numéricos en la interfaz de pestañas
   document.getElementById('cntTodos').textContent     = `(${ads.length})`;
   document.getElementById('cntDisponible').textContent = `(${ads.filter(a => a.disponible === 1).length})`;
   document.getElementById('cntVendido').textContent    = `(${ads.filter(a => a.disponible === 0).length})`;
 
+  // Control de estado vacio
   if (filtered.length === 0) {
     list.innerHTML = '';
     noAds.classList.remove('d-none');
@@ -127,6 +148,7 @@ function renderAds() {
   }
   noAds.classList.add('d-none');
 
+  // Renderizado optimizado usando map() y join()
   list.innerHTML = filtered.map(ad => `
     <div class="ad-row ${ad.disponible === 1 ? '' : 'sold'}" id="adRow-${ad.id_anuncio}">
 
@@ -184,10 +206,12 @@ function renderAds() {
 }
 
 /* ─────────────────────────────────
-   Tabs
+   Interacciones de UI (Pestañas)
 ───────────────────────────────── */
+// Cambia el enfoque de la vista activa y actualiza la vista
 function filterTab(tab, el) {
   activeTab = tab;
+  // limpia el estado activo de todos los botones y se lo asigna al seleccionado
   document.querySelectorAll('.ads-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   renderAds();
@@ -196,6 +220,8 @@ function filterTab(tab, el) {
 /* ─────────────────────────────────
    Toggle disponible / vendido, PATCH /api/anuncios/:id/disponibilidad
 ───────────────────────────────── */
+// Envia una peticion de actualizacion parcial para alterar de venta del anuncio
+// id: identificador interno del anuncio, checked: booleano que indica si es vendido o no
 async function toggleEstado(id, checked) {
   try {
     const res = await fetch(`/api/anuncios/${id}/disponibilidad`, {
@@ -209,11 +235,11 @@ async function toggleEstado(id, checked) {
       return;
     }
 
-    //Actualizar el array local para no recargar todo
+    //Actualizar el caché local para reflejar cambios local para no recargar todo
     const ad = ads.find(a => a.id_anuncio === id);
     if (ad) ad.disponible = checked ? 1 : 0;
 
-    renderAds();
+    renderAds(); // Actualiza la vista
     showToast(`Anuncio marcado como ${checked ? 'Disponible' : 'Vendido'}.`);
 
 } catch (error){
@@ -224,6 +250,7 @@ async function toggleEstado(id, checked) {
 /* ─────────────────────────────────
    Editar perfil, PUT /api/usuarios/:id
 ───────────────────────────────── */
+// LLena los campos del formulario de edición del perfil extrayendo los datos en memoria
 function abrirEditarPerfil() {
   document.getElementById('editNombre').value      = usuarioActivo.nombre_completo;
   document.getElementById('editEmailLocked').textContent = usuarioActivo.email;
@@ -236,6 +263,7 @@ function abrirEditarPerfil() {
   new bootstrap.Modal(document.getElementById('modalEditPerfil')).show();
 }
 
+// escucha el envio del formulario de edición, actualiza el backend y recarga la vista
  document.getElementById('editPerfilForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
@@ -278,10 +306,12 @@ function abrirEditarPerfil() {
 /* ─────────────────────────────────
    Editar anuncio, PUT /api/anuncios/:id
 ───────────────────────────────── */
+// Rellena el formulario multipart evaluando los datos locales del libro
 function abrirEditarAnuncio(id) {
   const ad = ads.find(a => a.id_anuncio === id);
   if (!ad) return;
 
+  // Inyecta los datos en el formulario
   document.getElementById('editAdId').value       = id;
   document.getElementById('editAdTitulo').value   = ad.titulo;
   document.getElementById('editAdAutor').value    = ad.autor;
@@ -289,19 +319,21 @@ function abrirEditarAnuncio(id) {
   document.getElementById('editAdEstado').value = ad.condicion === 1 ? 'Nuevo' : 'Usado';
   document.getElementById('editAdMateria').value   = ad.id_materia;
 
-  // Preview de imagen actual
+  // Construcción de la previsualización de la imagen actual alojada en el servidor
   const box   = document.getElementById('editPreviewBox');
   const input = box.querySelector('input[type=file]');
+  
   box.innerHTML = '';
   const img = document.createElement('img');
-  img.src = `${ad.foto_url}`;
-  img.onerror = () => { img.src = '../IMG/books.png'; };
+  img.src = `${ad.foto_url}`;                              // URL de la imagen local
+  img.onerror = () => { img.src = '../IMG/books.png'; };   // Si la imagen no existe, muestra el placeholder
   box.appendChild(img);
   box.appendChild(input);
 
   new bootstrap.Modal(document.getElementById('modalEditAd')).show();
 }
 
+// Procesa en cliente la imagen nueva subida y genera la previsualización
 function previewEditImage(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -323,7 +355,8 @@ function previewEditImage(event) {
   reader.readAsDataURL(file);
 }
 
-// guardar la edicion
+// Escucha el envio del formulario de edición
+// Empaqueta los datos en un FormData para compatibilidad con Multer
 document.getElementById('editAnForm').addEventListener('submit', async function (e) {
   e.preventDefault();
 
@@ -339,18 +372,21 @@ document.getElementById('editAnForm').addEventListener('submit', async function 
     alert('Completa todos los campos obligatorios.'); 
     return; }
 
+  // Estructura de datos (Texto e Imagen)
   const formData = new FormData();
   formData.append('titulo', titulo);
   formData.append('autor', autor);
   formData.append('id_materia', id_materia);
   formData.append('edicion', edicion);
   formData.append('condicion', condicion);
+  
+  // Condicional: Solo anexa el campo si el usuario selecciona una imagen nueva
   if (foto) formData.append('foto', foto);
 
   try {
     const res = await fetch(`/api/anuncios/${id}`, {
       method: 'PUT',
-      body: formData
+      body: formData                                   // API Fetch asume automaticamen los headers boundary multipart
     });
     
     const data = await res.json();
@@ -372,18 +408,21 @@ document.getElementById('editAnForm').addEventListener('submit', async function 
 /* ─────────────────────────────────
    Eliminar anuncio, DELETE /api/anuncios/:id
 ───────────────────────────────── */
+// Pedir al usuario que confirme la eliminación del anuncio
 function pedirEliminar(id) {
   const ad = ads.find(a => a.id_anuncio === id);
   if (!ad) return;
-  pendingDelete = id;
+  
+  pendingDelete = id;  // Guarda el ID del anuncio para confirmar la eliminación
   document.getElementById('deleteAdName').textContent = `"${ad.titulo}"`;
   new bootstrap.Modal(document.getElementById('modalDelete')).show();
 }
 
+// Ejecuta la llamada a la API para efectuar el borrado logico
 async function confirmarEliminar() {
   try {
     const res = await fetch(`/api/anuncios/${pendingDelete}`, {
-      method: 'DELETE'
+      method: 'DELETE'  // Notifica al backend que se quiere borrar el anuncio
     });
 
     if (!res.ok){
@@ -391,9 +430,10 @@ async function confirmarEliminar() {
       return;
     }
 
-    pendingDelete = null;
+    pendingDelete = null;  // Limpia el ID del anuncio para que no se confirme otra vez
     bootstrap.Modal.getInstance(document.getElementById('modalDelete')).hide();
-    await cargarAnuncios();
+    
+    await cargarAnuncios();  // Recarga la vista
     new bootstrap.Toast(document.getElementById('toastEliminado')).show();
 
   } catch (error) {
@@ -404,6 +444,7 @@ async function confirmarEliminar() {
 /* ─────────────────────────────────
    Toast general
 ───────────────────────────────── */
+// Dispara el componente toast con el mensaje
 function showToast(msg) {
   document.getElementById('toastMsg').textContent = msg;
   new bootstrap.Toast(document.getElementById('toastGuardado')).show();
@@ -415,6 +456,8 @@ function showToast(msg) {
 function toggleDropdown() {
   document.getElementById('profileDropdown').classList.toggle('open');
 }
+
+// Cierra el menú desplegable al hacer clic fuera
 document.addEventListener('click', function(e) {
   const wrapper = document.querySelector('.profile-wrapper');
   if (wrapper && !wrapper.contains(e.target)) {

@@ -2,6 +2,7 @@
 function obtenerUsuario() {
     const datos = sessionStorage.getItem('usuario');
 
+    // Si no hay sesión activa, redirige al login
     if (!datos) {
         window.location.href = 'login.html';
         return null;
