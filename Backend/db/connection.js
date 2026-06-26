@@ -2,7 +2,7 @@
    Configuracion de la Base de datos
 ───────────────────────────────── */
 // Este modulo establece el pool de conexiones hacia la base de datos MySQL
-// Utilizando promesas para permitir un flujo asincrono.
+// Utilizando promise para permitir un flujo asincrono.
 
 const mysql = require('mysql2/promise');
 require('dotenv').config(); //carga variables de entorno dende el archivo .env
